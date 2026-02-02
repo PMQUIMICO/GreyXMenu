@@ -15,7 +15,7 @@ end
 local CONFIG = {
     Name = "GreyXMenu",
     Version = "1.0",
-    Main = "https://raw.githubusercontent.com/PMQUIMICO/GreyXMenu/main/main.lua",
+    Main = "https://raw.githubusercontent.com/PMQUIMICO/GreyXMenu/main/Main.lua",
     AllowedPlaces = {
         -- opcional: PlaceIds permitidos
         -- 123456789
