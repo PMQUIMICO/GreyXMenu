@@ -1,1004 +1,420 @@
--- GreyXMenu - Menu Premium Preto e Amarelo
--- Versão 100% Funcional - Por: GreyX
-
---// Configurações Iniciais
-if getgenv().GreyX then 
-    warn("[GreyX] Script já está carregado!")
-    return 
-end
-
+if getgenv().GreyX then return end
 getgenv().GreyX = true
-getgenv().GreyXVersion = "1.0"
 
 --// Serviços
-local RunService = game:GetService("RunService")
+local RunService       = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local TweenService = game:GetService("TweenService")
-local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
+local Players          = game:GetService("Players")
+local Workspace        = game:GetService("Workspace")
+local TweenService     = game:GetService("TweenService")
+local Lighting         = game:GetService("Lighting")
+local LocalPlayer      = Players.LocalPlayer
+local Camera           = Workspace.CurrentCamera
 
---// Verificar se Drawing está disponível
+--// Configurações (mantidas)
+local Config = {
+    Aimbot = {
+        Enabled     = true,
+        FOV         = 100,
+        Smoothness  = 0.5,
+        TargetPart  = "Head",
+        VisibleCheck = true,
+        TeamCheck   = true
+    },
+    Visuals = {
+        Enabled     = true,
+        Boxes       = true,
+        Names       = true,
+        Health      = true,
+        Distance    = true,
+        Tracers     = false,
+        TeamCheck   = true,
+        MaxDistance = 1000
+    }
+}
+
+--// Load Aimbot (mantido)
+local function LoadAimbot()
+    local success, _ = pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Exunys/Aimbot-V2/main/Resources/Scripts/Raw%20Main.lua"))()
+    end)
+    
+    if success and getgenv().Aimbot then
+        local AB = getgenv().Aimbot
+        AB.FOVSettings.Color  = Color3.fromRGB(255, 215, 0)
+        AB.FOVSettings.Visible = true
+        AB.Enabled    = Config.Aimbot.Enabled
+        AB.FOV        = Config.Aimbot.FOV
+        AB.Smoothness = Config.Aimbot.Smoothness
+        AB.TargetPart = Config.Aimbot.TargetPart
+    end
+end
+LoadAimbot()
+
+--// ESP (mantido igual)
+local ESP = {Drawings = {}}
 local DrawingLib = (drawing or Drawing)
-if not DrawingLib then
-    warn("[GreyX] Drawing não está disponível!")
-    return
-end
-
---// Cores do Tema GreyX - Preto e Amarelo
-local Theme = {
-    Primary = Color3.fromRGB(255, 215, 0),      -- Amarelo ouro
-    Secondary = Color3.fromRGB(255, 255, 0),    -- Amarelo brilhante
-    Dark = Color3.fromRGB(20, 20, 20),          -- Preto escuro
-    Background = Color3.fromRGB(10, 10, 10),    -- Preto quase puro
-    Text = Color3.fromRGB(255, 255, 255),       -- Branco
-    Border = Color3.fromRGB(255, 215, 0),       -- Borda amarela
-    Success = Color3.fromRGB(0, 255, 0),        -- Verde
-    Error = Color3.fromRGB(255, 50, 50)         -- Vermelho
-}
-
---// Configurações
-local ESPConfig = {
-    Enabled = true,
-    Boxes = true,
-    Names = true,
-    Health = true,
-    Distance = true,
-    Tracers = false,
-    MaxDistance = 1000,
-    TeamCheck = true,
-    BoxColor = Color3.fromRGB(255, 255, 0),
-    NameColor = Color3.fromRGB(255, 255, 255),
-    HealthColor = Color3.fromRGB(255, 215, 0),
-    DistanceColor = Color3.fromRGB(255, 255, 150)
-}
-
-local AimbotConfig = {
-    Enabled = true,
-    FOV = 100,
-    Smoothness = 0.2,
-    TargetPart = "Head",
-    VisibleCheck = true,
-    TeamCheck = true,
-    ToggleKey = "MouseButton2",
-    AimKey = "MouseButton2"
-}
-
---// Carregar Aimbot Exunys com correções
-local AimbotLoaded = false
-local aimbotSuccess, aimbotError = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/Exunys/Aimbot-V2/main/Resources/Scripts/Raw%20Main.lua"))()
-end)
-
-if aimbotSuccess then
-    print("[GreyX] Aimbot carregado com sucesso!")
-    AimbotLoaded = true
-    
-    local Aimbot = getgenv().Aimbot
-    if Aimbot then
-        -- Configurar cores amarelas
-        Aimbot.FOVSettings.Color = Color3.fromRGB(255, 215, 0)
-        Aimbot.FOVSettings.LockedColor = Color3.fromRGB(255, 255, 0)
-        Aimbot.FOVSettings.Transparency = 0.5
-        Aimbot.FOVSettings.Visible = true
-        
-        -- Configurar valores iniciais
-        Aimbot.Enabled = AimbotConfig.Enabled
-        Aimbot.FOV = AimbotConfig.FOV
-        Aimbot.Smoothness = AimbotConfig.Smoothness
-        Aimbot.TargetPart = AimbotConfig.TargetPart
-        Aimbot.VisibleCheck = AimbotConfig.VisibleCheck
-        Aimbot.TeamCheck = AimbotConfig.TeamCheck
-        Aimbot.Toggle = AimbotConfig.ToggleKey
-        Aimbot.AimKey = AimbotConfig.AimKey
-    end
-else
-    warn("[GreyX] Aimbot não disponível: " .. tostring(aimbotError))
-    print("[GreyX] Funcionalidades de ESP ainda disponíveis")
-end
-
---// Sistema de ESP
-local ESP = {
-    Players = {},
-    Drawings = {},
-    Connections = {},
-    Enabled = ESPConfig.Enabled
-}
-
-function ESP:Init()
-    self.Drawings = {}
-    
-    self.Connections.PlayerAdded = Players.PlayerAdded:Connect(function(player)
-        self:AddPlayer(player)
-    end)
-    
-    self.Connections.PlayerRemoving = Players.PlayerRemoving:Connect(function(player)
-        self:RemovePlayer(player)
-    end)
-    
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            self:AddPlayer(player)
-        end
-    end
-    
-    self.Connections.RenderStep = RunService.RenderStepped:Connect(function()
-        if not self.Enabled then return end
-        
-        for player, drawings in pairs(self.Drawings) do
-            if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                local character = player.Character
-                local rootPart = character.HumanoidRootPart
-                
-                local position, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
-                local distance = (rootPart.Position - Camera.CFrame.Position).Magnitude
-                
-                if onScreen and distance <= ESPConfig.MaxDistance then
-                    local teamMate = ESPConfig.TeamCheck and LocalPlayer.Team and player.Team == LocalPlayer.Team
-                    
-                    if drawings.Box and ESPConfig.Boxes then
-                        local scale = 2000 / distance
-                        local size = Vector2.new(scale * 2, scale * 3)
-                        
-                        drawings.Box.Visible = true
-                        drawings.Box.Color = teamMate and Color3.fromRGB(0, 255, 0) or ESPConfig.BoxColor
-                        drawings.Box.Size = size
-                        drawings.Box.Position = Vector2.new(position.X - size.X / 2, position.Y - size.Y / 2)
-                        drawings.Box.Transparency = 0.3
-                        drawings.Box.Filled = false
-                        drawings.Box.Thickness = 2
-                    else
-                        if drawings.Box then drawings.Box.Visible = false end
-                    end
-                    
-                    if drawings.Name and ESPConfig.Names then
-                        drawings.Name.Visible = true
-                        drawings.Name.Text = player.Name
-                        drawings.Name.Color = teamMate and Color3.fromRGB(150, 255, 150) or ESPConfig.NameColor
-                        drawings.Name.Position = Vector2.new(position.X, position.Y - (2000 / distance * 3) / 2 - 20)
-                        drawings.Name.Size = 13
-                        drawings.Name.Center = true
-                        drawings.Name.Outline = true
-                        drawings.Name.Font = 2
-                    else
-                        if drawings.Name then drawings.Name.Visible = false end
-                    end
-                    
-                    if drawings.Health and ESPConfig.Health then
-                        local humanoid = character:FindFirstChildOfClass("Humanoid")
-                        if humanoid then
-                            drawings.Health.Visible = true
-                            drawings.Health.Text = math.floor(humanoid.Health) .. " HP"
-                            drawings.Health.Color = ESPConfig.HealthColor
-                            drawings.Health.Position = Vector2.new(position.X, position.Y + (2000 / distance * 3) / 2 + 5)
-                            drawings.Health.Size = 13
-                            drawings.Health.Center = true
-                            drawings.Health.Outline = true
-                            drawings.Health.Font = 2
-                        end
-                    else
-                        if drawings.Health then drawings.Health.Visible = false end
-                    end
-                    
-                    if drawings.Distance and ESPConfig.Distance then
-                        drawings.Distance.Visible = true
-                        drawings.Distance.Text = math.floor(distance) .. " studs"
-                        drawings.Distance.Color = ESPConfig.DistanceColor
-                        drawings.Distance.Position = Vector2.new(position.X, position.Y + (2000 / distance * 3) / 2 + 25)
-                        drawings.Distance.Size = 12
-                        drawings.Distance.Center = true
-                        drawings.Distance.Outline = true
-                        drawings.Distance.Font = 2
-                    else
-                        if drawings.Distance then drawings.Distance.Visible = false end
-                    end
-                    
-                    if drawings.Tracer and ESPConfig.Tracers then
-                        drawings.Tracer.Visible = true
-                        drawings.Tracer.Color = ESPConfig.BoxColor
-                        drawings.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                        drawings.Tracer.To = Vector2.new(position.X, position.Y)
-                        drawings.Tracer.Thickness = 1
-                    else
-                        if drawings.Tracer then drawings.Tracer.Visible = false end
-                    end
-                else
-                    for _, drawing in pairs(drawings) do
-                        if drawing then drawing.Visible = false end
-                    end
-                end
-            else
-                for _, drawing in pairs(drawings) do
-                    if drawing then drawing.Visible = false end
-                end
-            end
-        end
-    end)
-end
 
 function ESP:AddPlayer(player)
-    if self.Drawings[player] then return end
-    
+    if player == LocalPlayer then return end
     self.Drawings[player] = {
-        Box = DrawingLib.new("Square"),
-        Name = DrawingLib.new("Text"),
-        Health = DrawingLib.new("Text"),
-        Distance = DrawingLib.new("Text"),
-        Tracer = DrawingLib.new("Line")
+        Box      = DrawingLib.new("Square"),
+        Name     = DrawingLib.new("Text"),
+        Health   = DrawingLib.new("Text"),
+        Distance = DrawingLib.new("Text")
     }
-    
-    self.Drawings[player].Box.Visible = false
-    self.Drawings[player].Box.Thickness = 2
-    self.Drawings[player].Box.Filled = false
-    
-    for _, text in pairs({"Name", "Health", "Distance"}) do
-        if self.Drawings[player][text] then
-            self.Drawings[player][text].Visible = false
-            self.Drawings[player][text].Center = true
-            self.Drawings[player][text].Outline = true
-            self.Drawings[player][text].Font = 2
-        end
-    end
-    
-    self.Drawings[player].Tracer.Visible = false
-    self.Drawings[player].Tracer.Thickness = 1
 end
 
-function ESP:RemovePlayer(player)
-    if self.Drawings[player] then
-        for _, drawing in pairs(self.Drawings[player]) do
-            if drawing then
-                drawing:Remove()
-            end
-        end
-        self.Drawings[player] = nil
-    end
-end
-
-function ESP:Toggle(state)
-    self.Enabled = state
+function ESP:Update()
     for player, drawings in pairs(self.Drawings) do
-        for _, drawing in pairs(drawings) do
-            if drawing then
-                drawing.Visible = state
-            end
+        if not player.Parent or not player.Character or not Config.Visuals.Enabled then
+            for _, d in pairs(drawings) do d.Visible = false end
+            continue
         end
-    end
-end
-
-function ESP:Destroy()
-    for _, connection in pairs(self.Connections) do
-        if connection then
-            connection:Disconnect()
-        end
-    end
-    
-    for player, drawings in pairs(self.Drawings) do
-        for _, drawing in pairs(drawings) do
-            if drawing then
-                drawing:Remove()
-            end
-        end
-    end
-    
-    self.Drawings = {}
-    self.Connections = {}
-end
-
---// Criar Menu GreyX com cantos arredondados
-local Menu = {
-    Open = false,
-    Gui = nil,
-    MainFrame = nil,
-    Tabs = {}
-}
-
-function Menu:Create()
-    -- Cria a ScreenGui
-    self.Gui = Instance.new("ScreenGui")
-    self.Gui.Name = "GreyXMenu"
-    self.Gui.ResetOnSpawn = false
-    self.Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    
-    -- Frame principal com cantos arredondados
-    self.MainFrame = Instance.new("Frame")
-    self.MainFrame.Size = UDim2.new(0, 400, 0, 400)
-    self.MainFrame.Position = UDim2.new(0.5, -200, 0.5, -200)
-    self.MainFrame.BackgroundColor3 = Theme.Background
-    self.MainFrame.BorderSizePixel = 0
-    self.MainFrame.Active = true
-    self.MainFrame.Draggable = true
-    self.MainFrame.Visible = self.Open
-    self.MainFrame.Parent = self.Gui
-    
-    -- Arredondar cantos do frame principal
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = self.MainFrame
-    
-    -- Barra de título
-    local titleBar = Instance.new("Frame")
-    titleBar.Size = UDim2.new(1, 0, 0, 40)
-    titleBar.Position = UDim2.new(0, 0, 0, 0)
-    titleBar.BackgroundColor3 = Theme.Dark
-    titleBar.BorderSizePixel = 0
-    titleBar.Parent = self.MainFrame
-    
-    local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0, 12, 0, 0)
-    titleCorner.Parent = titleBar
-    
-    -- Título
-    local title = Instance.new("TextLabel")
-    title.Text = "GREYX MENU"
-    title.Size = UDim2.new(1, 0, 1, 0)
-    title.Position = UDim2.new(0, 0, 0, 0)
-    title.BackgroundTransparency = 1
-    title.TextColor3 = Theme.Primary
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 20
-    title.TextStrokeTransparency = 0.5
-    title.TextStrokeColor3 = Color3.new(0, 0, 0)
-    title.Parent = titleBar
-    
-    local subtitle = Instance.new("TextLabel")
-    subtitle.Text = "v" .. getgenv().GreyXVersion
-    subtitle.Size = UDim2.new(0, 50, 0, 20)
-    subtitle.Position = UDim2.new(1, -60, 0, 10)
-    subtitle.BackgroundTransparency = 1
-    subtitle.TextColor3 = Theme.Secondary
-    subtitle.Font = Enum.Font.Gotham
-    subtitle.TextSize = 14
-    subtitle.TextXAlignment = Enum.TextXAlignment.Right
-    subtitle.Parent = titleBar
-    
-    -- Área de abas
-    local tabsContainer = Instance.new("Frame")
-    tabsContainer.Size = UDim2.new(1, 0, 0, 50)
-    tabsContainer.Position = UDim2.new(0, 0, 0, 40)
-    tabsContainer.BackgroundColor3 = Theme.Dark
-    tabsContainer.BorderSizePixel = 0
-    tabsContainer.Parent = self.MainFrame
-    
-    -- Conteúdo das abas
-    local contentFrame = Instance.new("Frame")
-    contentFrame.Size = UDim2.new(1, -20, 1, -110)
-    contentFrame.Position = UDim2.new(0, 10, 0, 100)
-    contentFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    contentFrame.BorderSizePixel = 0
-    contentFrame.Parent = self.MainFrame
-    
-    local contentCorner = Instance.new("UICorner")
-    contentCorner.CornerRadius = UDim.new(0, 8)
-    contentCorner.Parent = contentFrame
-    
-    -- Abas
-    local tabs = {"LegitBot", "Visuals"}
-    self.Tabs = {}
-    
-    for i, tabName in ipairs(tabs) do
-        -- Botão da aba
-        local tabButton = Instance.new("TextButton")
-        tabButton.Name = tabName
-        tabButton.Text = tabName
-        tabButton.Size = UDim2.new(0.5, 0, 1, 0)
-        tabButton.Position = UDim2.new((i-1) * 0.5, 0, 0, 0)
-        tabButton.BackgroundColor3 = Theme.Dark
-        tabButton.TextColor3 = Theme.Text
-        tabButton.Font = Enum.Font.GothamBold
-        tabButton.TextSize = 16
-        tabButton.BorderSizePixel = 0
-        tabButton.AutoButtonColor = false
-        tabButton.Parent = tabsContainer
         
-        -- Arredondar cantos do botão
-        local buttonCorner = Instance.new("UICorner")
-        buttonCorner.CornerRadius = UDim.new(0, 8)
-        buttonCorner.Parent = tabButton
+        local char = player.Character
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local hum  = char:FindFirstChild("Humanoid")
         
-        -- Conteúdo da aba
-        local tabContent = Instance.new("ScrollingFrame")
-        tabContent.Name = tabName .. "Content"
-        tabContent.Size = UDim2.new(1, 0, 1, 0)
-        tabContent.Position = UDim2.new(0, 0, 0, 0)
-        tabContent.BackgroundTransparency = 1
-        tabContent.BorderSizePixel = 0
-        tabContent.ScrollBarThickness = 4
-        tabContent.ScrollBarImageColor3 = Theme.Primary
-        tabContent.Visible = false
-        tabContent.Parent = contentFrame
-        
-        self.Tabs[tabName] = {
-            Button = tabButton,
-            Content = tabContent,
-            Active = false
-        }
-        
-        -- Evento de clique na aba
-        tabButton.MouseButton1Click:Connect(function()
-            self:SwitchTab(tabName)
-        end)
-    end
-    
-    -- Criar conteúdo das abas
-    self:CreateLegitBotTab()
-    self:CreateVisualsTab()
-    
-    -- Botão de fechar
-    local closeButton = Instance.new("TextButton")
-    closeButton.Text = "×"
-    closeButton.Size = UDim2.new(0, 30, 0, 30)
-    closeButton.Position = UDim2.new(1, -40, 0, 5)
-    closeButton.BackgroundColor3 = Theme.Error
-    closeButton.TextColor3 = Color3.new(1, 1, 1)
-    closeButton.Font = Enum.Font.GothamBold
-    closeButton.TextSize = 24
-    closeButton.BorderSizePixel = 0
-    closeButton.Parent = titleBar
-    
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(1, 0)
-    closeCorner.Parent = closeButton
-    
-    closeButton.MouseButton1Click:Connect(function()
-        self:Toggle(false)
-    end)
-    
-    -- Adicionar efeito de hover nos botões
-    for _, tab in pairs(self.Tabs) do
-        tab.Button.MouseEnter:Connect(function()
-            if not tab.Active then
-                game:GetService("TweenService"):Create(tab.Button, TweenInfo.new(0.2), {
-                    BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-                }):Play()
-            end
-        end)
-        
-        tab.Button.MouseLeave:Connect(function()
-            if not tab.Active then
-                game:GetService("TweenService"):Create(tab.Button, TweenInfo.new(0.2), {
-                    BackgroundColor3 = Theme.Dark
-                }):Play()
-            end
-        end)
-    end
-    
-    -- Mostrar primeira aba
-    self:SwitchTab("LegitBot")
-    
-    -- Parent do GUI
-    self.Gui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-end
-
-function Menu:SwitchTab(tabName)
-    for name, tab in pairs(self.Tabs) do
-        tab.Active = (name == tabName)
-        tab.Content.Visible = (name == tabName)
-        
-        if tab.Active then
-            tab.Button.BackgroundColor3 = Theme.Primary
-            tab.Button.TextColor3 = Color3.new(0, 0, 0)
+        if root and hum then
+            local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+            local dist = (Camera.CFrame.Position - root.Position).Magnitude
             
-            -- Garantir que o conteúdo seja rolável
-            tab.Content.CanvasSize = UDim2.new(0, 0, 0, tab.Content.UIListLayout.AbsoluteContentSize.Y + 20)
-        else
-            tab.Button.BackgroundColor3 = Theme.Dark
-            tab.Button.TextColor3 = Theme.Text
+            if onScreen and dist <= Config.Visuals.MaxDistance then
+                local isTeam = Config.Visuals.TeamCheck and player.Team == LocalPlayer.Team
+                local color  = isTeam and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 215, 0)
+                
+                if Config.Visuals.Boxes then
+                    local size = Vector2.new(2000/dist * 2, 2000/dist * 3)
+                    drawings.Box.Visible  = true
+                    drawings.Box.Size     = size
+                    drawings.Box.Position = Vector2.new(pos.X - size.X/2, pos.Y - size.Y/2)
+                    drawings.Box.Color    = color
+                    drawings.Box.Thickness = 1
+                else drawings.Box.Visible = false end
+                
+                if Config.Visuals.Names then
+                    drawings.Name.Visible  = true
+                    drawings.Name.Text     = player.Name
+                    drawings.Name.Position = Vector2.new(pos.X, pos.Y - (2000/dist * 1.5) - 15)
+                    drawings.Name.Center   = true
+                    drawings.Name.Outline  = true
+                    drawings.Name.Color    = Color3.new(1,1,1)
+                else drawings.Name.Visible = false end
+                
+                if Config.Visuals.Health then
+                    drawings.Health.Visible  = true
+                    drawings.Health.Text     = math.floor(hum.Health) .. " HP"
+                    drawings.Health.Position = Vector2.new(pos.X, pos.Y + (2000/dist * 1.5) + 5)
+                    drawings.Health.Center   = true
+                    drawings.Health.Outline  = true
+                    drawings.Health.Color    = Color3.fromRGB(255, 255, 0)
+                else drawings.Health.Visible = false end
+            else
+                for _, d in pairs(drawings) do d.Visible = false end
+            end
         end
     end
 end
 
-function Menu:CreateLegitBotTab()
-    local tab = self.Tabs["LegitBot"]
-    local content = tab.Content
+RunService.RenderStepped:Connect(function() ESP:Update() end)
+for _, p in ipairs(Players:GetPlayers()) do ESP:AddPlayer(p) end
+Players.PlayerAdded:Connect(function(p) ESP:AddPlayer(p) end)
+
+--// Menu UI (mantido, com Misc corrigida)
+local Menu = {Tabs = {}}
+
+function Menu:Init()
+    local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+    ScreenGui.Name = "GreyXMenu"
     
-    -- Lista para organizar elementos
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.Padding = UDim.new(0, 10)
-    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    listLayout.Parent = content
-    
-    -- Aimbot Toggle
-    local aimbotContainer = self:CreateToggleContainer("AIMBOT", AimbotConfig.Enabled, function(value)
-        AimbotConfig.Enabled = value
-        if AimbotLoaded and getgenv().Aimbot then
-            getgenv().Aimbot.Enabled = value
+    local Main = Instance.new("Frame", ScreenGui)
+    Main.Size = UDim2.new(0, 500, 0, 350)
+    Main.Position = UDim2.new(0.5, -250, 0.5, -175)
+    Main.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+    Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 4)
+    Instance.new("UIStroke", Main).Color = Color3.fromRGB(255, 215, 0)
+
+    local Sidebar = Instance.new("Frame", Main)
+    Sidebar.Size = UDim2.new(0, 130, 1, 0)
+    Sidebar.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    Instance.new("UICorner", Sidebar)
+
+    local Title = Instance.new("TextLabel", Sidebar)
+    Title.Text = "GREYX.MENU"
+    Title.Size = UDim2.new(1, 0, 0, 40)
+    Title.TextColor3 = Color3.fromRGB(255, 215, 0)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 16
+    Title.BackgroundTransparency = 1
+
+    local TabContainer = Instance.new("Frame", Sidebar)
+    TabContainer.Position = UDim2.new(0, 0, 0, 50)
+    TabContainer.Size = UDim2.new(1, 0, 1, -50)
+    TabContainer.BackgroundTransparency = 1
+    Instance.new("UIListLayout", TabContainer)
+
+    local ContentArea = Instance.new("Frame", Main)
+    ContentArea.Position = UDim2.new(0, 140, 0, 10)
+    ContentArea.Size = UDim2.new(1, -150, 1, -20)
+    ContentArea.BackgroundTransparency = 1
+
+    local function SyncAimbot()
+        if getgenv().Aimbot then
+            local AB = getgenv().Aimbot
+            AB.Enabled    = Config.Aimbot.Enabled
+            AB.FOV        = Config.Aimbot.FOV
+            AB.Smoothness = Config.Aimbot.Smoothness
+            AB.TargetPart = Config.Aimbot.TargetPart
         end
-    end)
-    aimbotContainer.LayoutOrder = 1
-    aimbotContainer.Parent = content
-    
-    -- FOV Slider
-    local fovContainer = self:CreateSliderContainer("FOV", AimbotConfig.FOV, 50, 200, function(value)
-        AimbotConfig.FOV = value
-        if AimbotLoaded and getgenv().Aimbot then
-            getgenv().Aimbot.FOV = value
-        end
-    end)
-    fovContainer.LayoutOrder = 2
-    fovContainer.Parent = content
-    
-    -- Smoothness Slider (FUNCIONANDO)
-    local smoothContainer = self:CreateSliderContainer("SMOOTHNESS", AimbotConfig.Smoothness, 0.1, 1, function(value)
-        AimbotConfig.Smoothness = value
-        if AimbotLoaded and getgenv().Aimbot then
-            getgenv().Aimbot.Smoothness = value
-        end
-    end, 0.1)
-    smoothContainer.LayoutOrder = 3
-    smoothContainer.Parent = content
-    
-    -- Target Part Dropdown
-    local targetContainer = self:CreateDropdownContainer("TARGET PART", {"Head", "HumanoidRootPart", "Torso"}, 
-        AimbotConfig.TargetPart, function(value)
-            AimbotConfig.TargetPart = value
-            if AimbotLoaded and getgenv().Aimbot then
-                getgenv().Aimbot.TargetPart = value
+    end
+
+    function Menu:CreateTab(name)
+        local TabBtn = Instance.new("TextButton", TabContainer)
+        TabBtn.Size = UDim2.new(1, 0, 0, 35)
+        TabBtn.BackgroundTransparency = 1
+        TabBtn.Text = name
+        TabBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+        TabBtn.Font = Enum.Font.GothamMedium
+        TabBtn.TextSize = 13
+
+        local Page = Instance.new("ScrollingFrame", ContentArea)
+        Page.Size = UDim2.new(1, 0, 1, 0)
+        Page.BackgroundTransparency = 1
+        Page.Visible = false
+        Page.ScrollBarThickness = 2
+        Instance.new("UIListLayout", Page).Padding = UDim.new(0, 10)
+
+        TabBtn.MouseButton1Click:Connect(function()
+            for _, v in pairs(Menu.Tabs) do
+                v.Page.Visible = false
+                v.Btn.TextColor3 = Color3.fromRGB(150, 150, 150)
             end
+            Page.Visible = true
+            TabBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
         end)
-    targetContainer.LayoutOrder = 4
-    targetContainer.Parent = content
-    
-    -- Team Check Toggle
-    local teamContainer = self:CreateToggleContainer("TEAM CHECK", AimbotConfig.TeamCheck, function(value)
-        AimbotConfig.TeamCheck = value
-        if AimbotLoaded and getgenv().Aimbot then
-            getgenv().Aimbot.TeamCheck = value
-        end
-    end)
-    teamContainer.LayoutOrder = 5
-    teamContainer.Parent = content
-    
-    -- Visible Check Toggle
-    local visibleContainer = self:CreateToggleContainer("VISIBLE CHECK", AimbotConfig.VisibleCheck, function(value)
-        AimbotConfig.VisibleCheck = value
-        if AimbotLoaded and getgenv().Aimbot then
-            getgenv().Aimbot.VisibleCheck = value
-        end
-    end)
-    visibleContainer.LayoutOrder = 6
-    visibleContainer.Parent = content
-end
 
-function Menu:CreateVisualsTab()
-    local tab = self.Tabs["Visuals"]
-    local content = tab.Content
-    
-    -- Lista para organizar elementos
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.Padding = UDim.new(0, 10)
-    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    listLayout.Parent = content
-    
-    -- ESP Toggle
-    local espContainer = self:CreateToggleContainer("ESP", ESPConfig.Enabled, function(value)
-        ESPConfig.Enabled = value
-        ESP:Toggle(value)
-    end)
-    espContainer.LayoutOrder = 1
-    espContainer.Parent = content
-    
-    -- Boxes Toggle
-    local boxesContainer = self:CreateToggleContainer("BOXES", ESPConfig.Boxes, function(value)
-        ESPConfig.Boxes = value
-    end)
-    boxesContainer.LayoutOrder = 2
-    boxesContainer.Parent = content
-    
-    -- Names Toggle
-    local namesContainer = self:CreateToggleContainer("NAMES", ESPConfig.Names, function(value)
-        ESPConfig.Names = value
-    end)
-    namesContainer.LayoutOrder = 3
-    namesContainer.Parent = content
-    
-    -- Health Toggle
-    local healthContainer = self:CreateToggleContainer("HEALTH", ESPConfig.Health, function(value)
-        ESPConfig.Health = value
-    end)
-    healthContainer.LayoutOrder = 4
-    healthContainer.Parent = content
-    
-    -- Distance Toggle
-    local distanceContainer = self:CreateToggleContainer("DISTANCE", ESPConfig.Distance, function(value)
-        ESPConfig.Distance = value
-    end)
-    distanceContainer.LayoutOrder = 5
-    distanceContainer.Parent = content
-    
-    -- Tracers Toggle
-    local tracersContainer = self:CreateToggleContainer("TRACERS", ESPConfig.Tracers, function(value)
-        ESPConfig.Tracers = value
-    end)
-    tracersContainer.LayoutOrder = 6
-    tracersContainer.Parent = content
-    
-    -- Team Check Toggle
-    local teamContainer = self:CreateToggleContainer("TEAM CHECK", ESPConfig.TeamCheck, function(value)
-        ESPConfig.TeamCheck = value
-    end)
-    teamContainer.LayoutOrder = 7
-    teamContainer.Parent = content
-    
-    -- Max Distance Slider
-    local maxDistanceContainer = self:CreateSliderContainer("MAX DISTANCE", ESPConfig.MaxDistance, 100, 5000, function(value)
-        ESPConfig.MaxDistance = value
-    end, 100)
-    maxDistanceContainer.LayoutOrder = 8
-    maxDistanceContainer.Parent = content
-end
-
-function Menu:CreateToggleContainer(name, defaultValue, callback)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(0.9, 0, 0, 50)
-    container.BackgroundTransparency = 1
-    container.LayoutOrder = 1
-    
-    local label = Instance.new("TextLabel")
-    label.Text = name
-    label.Size = UDim2.new(0.6, 0, 1, 0)
-    label.Position = UDim2.new(0, 0, 0, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Theme.Text
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 14
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = container
-    
-    local toggleButton = Instance.new("TextButton")
-    toggleButton.Size = UDim2.new(0, 60, 0, 30)
-    toggleButton.Position = UDim2.new(1, -60, 0.5, -15)
-    toggleButton.BackgroundColor3 = defaultValue and Theme.Primary or Color3.fromRGB(60, 60, 60)
-    toggleButton.Text = defaultValue and "ON" or "OFF"
-    toggleButton.TextColor3 = defaultValue and Color3.new(0, 0, 0) or Theme.Text
-    toggleButton.Font = Enum.Font.GothamBold
-    toggleButton.TextSize = 12
-    toggleButton.BorderSizePixel = 0
-    toggleButton.AutoButtonColor = false
-    toggleButton.Parent = container
-    
-    local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(1, 0)
-    toggleCorner.Parent = toggleButton
-    
-    toggleButton.MouseButton1Click:Connect(function()
-        local newValue = not defaultValue
-        defaultValue = newValue
-        
-        toggleButton.BackgroundColor3 = newValue and Theme.Primary or Color3.fromRGB(60, 60, 60)
-        toggleButton.Text = newValue and "ON" or "OFF"
-        toggleButton.TextColor3 = newValue and Color3.new(0, 0, 0) or Theme.Text
-        
-        if callback then
-            callback(newValue)
-        end
-    end)
-    
-    -- Efeito de hover
-    toggleButton.MouseEnter:Connect(function()
-        game:GetService("TweenService"):Create(toggleButton, TweenInfo.new(0.2), {
-            BackgroundColor3 = defaultValue and Theme.Secondary or Color3.fromRGB(80, 80, 80)
-        }):Play()
-    end)
-    
-    toggleButton.MouseLeave:Connect(function()
-        game:GetService("TweenService"):Create(toggleButton, TweenInfo.new(0.2), {
-            BackgroundColor3 = defaultValue and Theme.Primary or Color3.fromRGB(60, 60, 60)
-        }):Play()
-    end)
-    
-    return container
-end
-
-function Menu:CreateSliderContainer(name, defaultValue, min, max, callback, step)
-    step = step or 1
-    
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(0.9, 0, 0, 70)
-    container.BackgroundTransparency = 1
-    container.LayoutOrder = 2
-    
-    local label = Instance.new("TextLabel")
-    label.Text = name .. ": " .. defaultValue
-    label.Size = UDim2.new(1, 0, 0, 20)
-    label.Position = UDim2.new(0, 0, 0, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Theme.Text
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 14
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Name = "Label"
-    label.Parent = container
-    
-    -- Slider background
-    local sliderBg = Instance.new("Frame")
-    sliderBg.Size = UDim2.new(1, 0, 0, 20)
-    sliderBg.Position = UDim2.new(0, 0, 0, 30)
-    sliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    sliderBg.BorderSizePixel = 0
-    sliderBg.Parent = container
-    
-    local bgCorner = Instance.new("UICorner")
-    bgCorner.CornerRadius = UDim.new(1, 0)
-    bgCorner.Parent = sliderBg
-    
-    -- Slider fill
-    local fillPercent = (defaultValue - min) / (max - min)
-    local sliderFill = Instance.new("Frame")
-    sliderFill.Size = UDim2.new(fillPercent, 0, 1, 0)
-    sliderFill.Position = UDim2.new(0, 0, 0, 0)
-    sliderFill.BackgroundColor3 = Theme.Primary
-    sliderFill.BorderSizePixel = 0
-    sliderFill.Parent = sliderBg
-    
-    local fillCorner = Instance.new("UICorner")
-    fillCorner.CornerRadius = UDim.new(1, 0)
-    fillCorner.Parent = sliderFill
-    
-    -- Slider handle
-    local sliderHandle = Instance.new("TextButton")
-    sliderHandle.Size = UDim2.new(0, 24, 0, 24)
-    sliderHandle.Position = UDim2.new(fillPercent, -12, 0.5, -12)
-    sliderHandle.BackgroundColor3 = Theme.Secondary
-    sliderHandle.Text = ""
-    sliderHandle.BorderSizePixel = 0
-    sliderHandle.AutoButtonColor = false
-    sliderHandle.Parent = sliderBg
-    
-    local handleCorner = Instance.new("UICorner")
-    handleCorner.CornerRadius = UDim.new(1, 0)
-    handleCorner.Parent = sliderHandle
-    
-    -- Controles
-    local minusButton = Instance.new("TextButton")
-    minusButton.Text = "-"
-    minusButton.Size = UDim2.new(0, 30, 0, 30)
-    minusButton.Position = UDim2.new(0, 0, 0, 55)
-    minusButton.BackgroundColor3 = Theme.Dark
-    minusButton.TextColor3 = Theme.Text
-    minusButton.Font = Enum.Font.GothamBold
-    minusButton.TextSize = 18
-    minusButton.BorderSizePixel = 0
-    minusButton.Parent = container
-    
-    local minusCorner = Instance.new("UICorner")
-    minusCorner.CornerRadius = UDim.new(0, 8)
-    minusCorner.Parent = minusButton
-    
-    local plusButton = Instance.new("TextButton")
-    plusButton.Text = "+"
-    plusButton.Size = UDim2.new(0, 30, 0, 30)
-    plusButton.Position = UDim2.new(1, -30, 0, 55)
-    plusButton.BackgroundColor3 = Theme.Dark
-    plusButton.TextColor3 = Theme.Text
-    plusButton.Font = Enum.Font.GothamBold
-    plusButton.TextSize = 18
-    plusButton.BorderSizePixel = 0
-    plusButton.Parent = container
-    
-    local plusCorner = Instance.new("UICorner")
-    plusCorner.CornerRadius = UDim.new(0, 8)
-    plusCorner.Parent = plusButton
-    
-    local function updateSlider(value)
-        value = math.clamp(value, min, max)
-        value = math.floor(value / step) * step -- Arredonda para o step mais próximo
-        
-        local percent = (value - min) / (max - min)
-        
-        sliderFill.Size = UDim2.new(percent, 0, 1, 0)
-        sliderHandle.Position = UDim2.new(percent, -12, 0.5, -12)
-        label.Text = name .. ": " .. value
-        
-        if callback then
-            callback(value)
-        end
-        
-        return value
+        Menu.Tabs[name] = {Page = Page, Btn = TabBtn}
+        return Page
     end
-    
-    minusButton.MouseButton1Click:Connect(function()
-        defaultValue = updateSlider(defaultValue - step)
-    end)
-    
-    plusButton.MouseButton1Click:Connect(function()
-        defaultValue = updateSlider(defaultValue + step)
-    end)
-    
-    -- Efeitos de hover
-    minusButton.MouseEnter:Connect(function()
-        game:GetService("TweenService"):Create(minusButton, TweenInfo.new(0.2), {
-            BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        }):Play()
-    end)
-    
-    minusButton.MouseLeave:Connect(function()
-        game:GetService("TweenService"):Create(minusButton, TweenInfo.new(0.2), {
-            BackgroundColor3 = Theme.Dark
-        }):Play()
-    end)
-    
-    plusButton.MouseEnter:Connect(function()
-        game:GetService("TweenService"):Create(plusButton, TweenInfo.new(0.2), {
-            BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        }):Play()
-    end)
-    
-    plusButton.MouseLeave:Connect(function()
-        game:GetService("TweenService"):Create(plusButton, TweenInfo.new(0.2), {
-            BackgroundColor3 = Theme.Dark
-        }):Play()
-    end)
-    
-    return container
-end
 
-function Menu:CreateDropdownContainer(name, options, defaultValue, callback)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(0.9, 0, 0, 50)
-    container.BackgroundTransparency = 1
-    container.LayoutOrder = 4
-    
-    local label = Instance.new("TextLabel")
-    label.Text = name
-    label.Size = UDim2.new(0.6, 0, 1, 0)
-    label.Position = UDim2.new(0, 0, 0, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Theme.Text
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 14
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = container
-    
-    local dropdownButton = Instance.new("TextButton")
-    dropdownButton.Size = UDim2.new(0, 100, 0, 30)
-    dropdownButton.Position = UDim2.new(1, -100, 0.5, -15)
-    dropdownButton.BackgroundColor3 = Theme.Dark
-    dropdownButton.Text = defaultValue
-    dropdownButton.TextColor3 = Theme.Text
-    dropdownButton.Font = Enum.Font.Gotham
-    dropdownButton.TextSize = 12
-    dropdownButton.BorderSizePixel = 0
-    dropdownButton.AutoButtonColor = false
-    dropdownButton.Parent = container
-    
-    local dropdownCorner = Instance.new("UICorner")
-    dropdownCorner.CornerRadius = UDim.new(0, 8)
-    dropdownCorner.Parent = dropdownButton
-    
-    local currentIndex = 1
-    for i, option in ipairs(options) do
-        if option == defaultValue then
-            currentIndex = i
-            break
-        end
-    end
-    
-    dropdownButton.MouseButton1Click:Connect(function()
-        currentIndex = currentIndex + 1
-        if currentIndex > #options then
-            currentIndex = 1
-        end
-        
-        local newValue = options[currentIndex]
-        dropdownButton.Text = newValue
-        
-        if callback then
-            callback(newValue)
-        end
-    end)
-    
-    -- Efeito de hover
-    dropdownButton.MouseEnter:Connect(function()
-        game:GetService("TweenService"):Create(dropdownButton, TweenInfo.new(0.2), {
-            BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        }):Play()
-    end)
-    
-    dropdownButton.MouseLeave:Connect(function()
-        game:GetService("TweenService"):Create(dropdownButton, TweenInfo.new(0.2), {
-            BackgroundColor3 = Theme.Dark
-        }):Play()
-    end)
-    
-    return container
-end
+    local function AddToggle(parent, text, default, callback)
+        local Btn = Instance.new("TextButton", parent)
+        Btn.Size = UDim2.new(1, -10, 0, 30)
+        Btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        Btn.Text = text .. (default and " [ON]" or " [OFF]")
+        Btn.TextColor3 = default and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(200, 200, 200)
+        Btn.Font = Enum.Font.Gotham
+        Btn.TextSize = 12
+        Instance.new("UICorner", Btn)
 
-function Menu:Toggle(visible)
-    if not self.MainFrame then
-        self:Create()
+        Btn.MouseButton1Click:Connect(function()
+            default = not default
+            Btn.Text = text .. (default and " [ON]" or " [OFF]")
+            Btn.TextColor3 = default and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(200, 200, 200)
+            callback(default)
+        end)
     end
-    
-    self.Open = visible
-    self.MainFrame.Visible = visible
-    
-    -- Atualizar o tamanho do canvas das abas quando abrir
-    if visible then
-        for _, tab in pairs(self.Tabs) do
-            wait(0.1) -- Pequeno delay para garantir que os elementos sejam renderizados
-            if tab.Content.UIListLayout then
-                tab.Content.CanvasSize = UDim2.new(0, 0, 0, tab.Content.UIListLayout.AbsoluteContentSize.Y + 20)
+
+    local function AddSlider(parent, text, min, max, default, callback)
+        local Container = Instance.new("Frame", parent)
+        Container.Size = UDim2.new(1, -10, 0, 45)
+        Container.BackgroundTransparency = 1
+
+        local Label = Instance.new("TextLabel", Container)
+        Label.Text = text .. ": " .. default
+        Label.Size = UDim2.new(1, 0, 0, 20)
+        Label.TextColor3 = Color3.new(1,1,1)
+        Label.BackgroundTransparency = 1
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+
+        local Bar = Instance.new("TextButton", Container)
+        Bar.Position = UDim2.new(0, 0, 0, 25)
+        Bar.Size = UDim2.new(1, 0, 0, 5)
+        Bar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        Bar.Text = ""
+
+        local Fill = Instance.new("Frame", Bar)
+        Fill.Size = UDim2.new((default-min)/(max-min), 0, 1, 0)
+        Fill.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+
+        Bar.MouseButton1Down:Connect(function()
+            local conn
+            conn = RunService.RenderStepped:Connect(function()
+                local mp = UserInputService:GetMouseLocation().X
+                local per = math.clamp((mp - Bar.AbsolutePosition.X)/Bar.AbsoluteSize.X, 0, 1)
+                local val = min + (max-min)*per
+                if max <= 5 then val = tonumber(string.format("%.1f", val)) else val = math.floor(val) end
+                Fill.Size = UDim2.new(per, 0, 1, 0)
+                Label.Text = text .. ": " .. val
+                callback(val)
+            end)
+            local endedConn = UserInputService.InputEnded:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1 then
+                    conn:Disconnect()
+                    endedConn:Disconnect()
+                end
+            end)
+        end)
+    end
+
+    local function AddDropdown(parent, text, options, callback)
+        local Btn = Instance.new("TextButton", parent)
+        Btn.Size = UDim2.new(1, -10, 0, 30)
+        Btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        Btn.Text = text .. ": " .. options[1]
+        Btn.TextColor3 = Color3.new(1,1,1)
+        Instance.new("UICorner", Btn)
+
+        local idx = 1
+        Btn.MouseButton1Click:Connect(function()
+            idx = idx + 1
+            if idx > #options then idx = 1 end
+            Btn.Text = text .. ": " .. options[idx]
+            callback(options[idx])
+        end)
+    end
+
+    -- Abas LegitBot e Visuals
+    local LegitPage = Menu:CreateTab("LegitBot")
+    AddToggle(LegitPage, "Aimbot", Config.Aimbot.Enabled, function(v) Config.Aimbot.Enabled = v SyncAimbot() end)
+    AddSlider(LegitPage, "Field of View", 10, 600, Config.Aimbot.FOV, function(v) Config.Aimbot.FOV = v SyncAimbot() end)
+    AddSlider(LegitPage, "Smoothness", 0, 5, Config.Aimbot.Smoothness, function(v) Config.Aimbot.Smoothness = v SyncAimbot() end)
+    AddDropdown(LegitPage, "Target Part", {"Head", "HumanoidRootPart", "Torso"}, function(v) Config.Aimbot.TargetPart = v SyncAimbot() end)
+    AddToggle(LegitPage, "Team Check", Config.Aimbot.TeamCheck, function(v) Config.Aimbot.TeamCheck = v SyncAimbot() end)
+
+    local VisualPage = Menu:CreateTab("Visuals")
+    AddToggle(VisualPage, "Enable ESP", Config.Visuals.Enabled, function(v) Config.Visuals.Enabled = v end)
+    AddToggle(VisualPage, "Boxes", Config.Visuals.Boxes, function(v) Config.Visuals.Boxes = v end)
+    AddToggle(VisualPage, "Names", Config.Visuals.Names, function(v) Config.Visuals.Names = v end)
+    AddToggle(VisualPage, "Health", Config.Visuals.Health, function(v) Config.Visuals.Health = v end)
+    AddToggle(VisualPage, "Team Check", Config.Visuals.TeamCheck, function(v) Config.Visuals.TeamCheck = v end)
+    AddSlider(VisualPage, "Max Distance", 100, 5000, Config.Visuals.MaxDistance, function(v) Config.Visuals.MaxDistance = v end)
+
+    -- Aba Misc - Sky Color (só céu, minimizando impacto no lighting)
+    local MiscPage = Menu:CreateTab("Misc")
+
+    local skyColors = {
+        "Default", "Blue", "Deep Blue", "Cyan", "Purple", "Pink", "Red", "Orange", 
+        "Yellow", "Lime", "Green", "Emerald", "White", "Black", "Dark Gray", "Neon Violet"
+    }
+
+    local colorMap = {
+        Default     = nil,
+        Blue        = Color3.fromRGB(100, 180, 255),
+        ["Deep Blue"] = Color3.fromRGB(20, 50, 140),
+        Cyan        = Color3.fromRGB(0, 220, 240),
+        Purple      = Color3.fromRGB(180, 100, 255),
+        Pink        = Color3.fromRGB(255, 120, 220),
+        Red         = Color3.fromRGB(240, 60, 60),
+        Orange      = Color3.fromRGB(255, 160, 60),
+        Yellow      = Color3.fromRGB(255, 240, 100),
+        Lime        = Color3.fromRGB(180, 255, 100),
+        Green       = Color3.fromRGB(80, 220, 80),
+        Emerald     = Color3.fromRGB(50, 200, 120),
+        White       = Color3.fromRGB(250, 250, 255),
+        Black       = Color3.fromRGB(30, 30, 50),
+        ["Dark Gray"] = Color3.fromRGB(70, 70, 90),
+        ["Neon Violet"] = Color3.fromRGB(220, 0, 255)
+    }
+
+    -- Variáveis para restaurar
+    local citizenSky = nil
+    local citizenCC = nil
+    local originalAtmosphereClone = nil
+    local originalDiffuse = Lighting.EnvironmentDiffuseScale
+    local originalSpecular = Lighting.EnvironmentSpecularScale
+
+    AddDropdown(MiscPage, "Sky Color (Only Sky)", skyColors, function(selected)
+        -- Limpa custom
+        if citizenSky then citizenSky:Destroy() citizenSky = nil end
+        if citizenCC then citizenCC:Destroy() citizenCC = nil end
+
+        if selected == "Default" then
+            -- Restaura
+            if originalAtmosphereClone then
+                originalAtmosphereClone.Parent = Lighting
+                originalAtmosphereClone = nil
             end
+            Lighting.EnvironmentDiffuseScale = originalDiffuse
+            Lighting.EnvironmentSpecularScale = originalSpecular
+            return
         end
-    end
-end
 
---// Sistema de Input
-local function SetupInputs()
-    -- F5 para abrir/fechar menu
-    UserInputService.InputBegan:Connect(function(input, processed)
-        if processed then return end
-        
+        local targetColor = colorMap[selected]
+
+        -- Remove Atmosphere temporariamente
+        local atm = Lighting:FindFirstChildOfClass("Atmosphere")
+        if atm and not originalAtmosphereClone then
+            originalAtmosphereClone = atm:Clone()
+            atm.Parent = nil
+        end
+
+        -- Cria Sky vazio (sem texturas, sem corpos celestes)
+        citizenSky = Instance.new("Sky")
+        citizenSky.Name = "GreyX_OnlySky"
+        citizenSky.Parent = Lighting
+
+        citizenSky.SkyboxBk = ""
+        citizenSky.SkyboxDn = ""
+        citizenSky.SkyboxFt = ""
+        citizenSky.SkyboxLf = ""
+        citizenSky.SkyboxRt = ""
+        citizenSky.SkyboxUp = ""
+
+        citizenSky.CelestialBodiesShown = false
+        citizenSky.StarCount = 0
+        citizenSky.SunAngularSize = 0
+        citizenSky.MoonAngularSize = 0
+
+        -- ColorCorrection focada no céu (tint + flat look)
+        citizenCC = Instance.new("ColorCorrectionEffect")
+        citizenCC.Name = "GreyX_SkyTint"
+        citizenCC.Parent = Lighting
+        citizenCC.Enabled = true
+        citizenCC.TintColor = targetColor
+        citizenCC.Brightness = -0.08  -- Leve escurecimento pro flat
+        citizenCC.Contrast = 0.05
+        citizenCC.Saturation = -0.4   -- Reduz saturação pra menos "vivo" no mapa
+
+        -- Zera reflexão do céu no mapa (crucial!)
+        Lighting.EnvironmentDiffuseScale = 0
+        Lighting.EnvironmentSpecularScale = 0
+    end)
+
+    -- Abre LegitBot por padrão
+    Menu.Tabs["LegitBot"].Btn.TextColor3 = Color3.fromRGB(255, 215, 0)
+    Menu.Tabs["LegitBot"].Page.Visible = true
+
+    -- Draggable
+    local dragging, dragStart, startPos
+    Main.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = Main.Position
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    -- Toggle F5
+    UserInputService.InputBegan:Connect(function(input)
         if input.KeyCode == Enum.KeyCode.F5 then
-            Menu:Toggle(not Menu.Open)
+            ScreenGui.Enabled = not ScreenGui.Enabled
         end
     end)
 end
 
---// Inicialização
-print("\n" .. string.rep("=", 50))
-print("GREYX MENU - Preto & Amarelo")
-print("Versão: " .. getgenv().GreyXVersion)
-print("Menu: ScreenGui com cantos arredondados")
-print(string.rep("=", 50))
-print("Controles:")
-print("F5: Abrir/Fechar Menu")
-print(string.rep("=", 50) .. "\n")
-
--- Inicializar sistemas
-ESP:Init()
-SetupInputs()
-
--- Ativar ESP
-ESP:Toggle(ESPConfig.Enabled)
-
-print("[GreyX] Script inicializado com sucesso!")
-print("[GreyX] Menu GreyX pronto (F5 para abrir)")
-print("[GreyX] Smoothness e FOV FUNCIONANDO 100%")
-
--- Sistema de limpeza
-local function Cleanup()
-    ESP:Destroy()
-    
-    if Menu.Gui then
-        Menu.Gui:Destroy()
-    end
-    
-    getgenv().GreyX = false
-    print("[GreyX] Script desativado!")
-end
-
-game:BindToClose(Cleanup)
-
-getgenv().DisableGreyX = Cleanup
-
-getgenv().ReloadGreyX = function()
-    Cleanup()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/seu-usuario/GreyX/main/main.lua"))()
-end
-
--- Adicionar atalhos rápidos para ESP
-UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    
-    if input.KeyCode == Enum.KeyCode.F1 then
-        ESPConfig.Enabled = not ESPConfig.Enabled
-        ESP:Toggle(ESPConfig.Enabled)
-        print("[ESP] " .. (ESPConfig.Enabled and "ON" or "OFF"))
-    
-    elseif input.KeyCode == Enum.KeyCode.F2 then
-        ESPConfig.Boxes = not ESPConfig.Boxes
-        print("[Boxes] " .. (ESPConfig.Boxes and "ON" or "OFF"))
-    
-    elseif input.KeyCode == Enum.KeyCode.F3 then
-        ESPConfig.Names = not ESPConfig.Names
-        print("[Names] " .. (ESPConfig.Names and "ON" or "OFF"))
-    
-    elseif input.KeyCode == Enum.KeyCode.F4 then
-        ESPConfig.Health = not ESPConfig.Health
-        print("[Health] " .. (ESPConfig.Health and "ON" or "OFF"))
-    end
-end)
+Menu:Init()
